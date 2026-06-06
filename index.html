@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rifa Solidaria — UPA Ponete de Pie</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --red: #e32d2d;
+    --red-dark: #b81e1e;
+    --blue: #5bb7e8;
+    --dark: #1a1a1a;
+    --gray: #f4f4f2;
+    --border: #e0e0dc;
+    --text: #1a1a1a;
+    --muted: #777;
+  }
+  body { font-family: 'Source Sans 3', sans-serif; background: #f7f7f5; color: var(--text); min-height: 100vh; }
+
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 2px; color: var(--dark); }
+  .logo .r { color: var(--red); }
+  .logo .b { color: var(--blue); }
+  .logo-sub { font-size: 10px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-top: 1px; }
+  .header-prize { text-align: right; }
+  .header-prize .prize-label { font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  .header-prize .prize-val { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 700; color: var(--red); }
+
+  .hero {
+    background: var(--red);
+    color: #fff;
+    text-align: center;
+    padding: 28px 24px 24px;
+  }
+  .hero h1 { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+  .hero p { font-size: 13px; margin-top: 6px; opacity: .85; line-height: 1.5; max-width: 480px; margin: 6px auto 0; }
+  .hero-meta { display: flex; justify-content: center; gap: 28px; margin-top: 16px; }
+  .hero-meta-item .hm-label { font-size: 10px; letter-spacing: 2px; opacity: .7; text-transform: uppercase; }
+  .hero-meta-item .hm-val { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 600; margin-top: 2px; }
+
+  .stats-bar {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat .s-val { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; color: var(--red); }
+  .stat .s-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .prog-wrap { flex: 1; min-width: 180px; max-width: 300px; }
+  .prog-bg { background: var(--gray); border-radius: 99px; height: 8px; overflow: hidden; }
+  .prog-fill { background: var(--red); height: 8px; border-radius: 99px; transition: width .5s; }
+  .prog-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-align: center; }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+
+  .legend { display: flex; gap: 16px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .legend-dot { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; }
+  .legend-dot.free { background: #fff; border: 1.5px solid var(--border); }
+  .legend-dot.taken { background: var(--red); }
+  .legend-dot.mine { background: #1a9e4a; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
+  .num-btn {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: #fff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all .12s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .num-btn:hover:not(.taken):not(.mine) { border-color: var(--red); color: var(--red); transform: scale(1.05); }
+  .num-btn.taken { background: var(--red); border-color: var(--red); color: #fff; cursor: not-allowed; }
+  .num-btn.mine { background: #1a9e4a; border-color: #1a9e4a; color: #fff; cursor: default; }
+  .num-btn.selected { border-color: var(--red); background: #fff5f5; color: var(--red); box-shadow: 0 0 0 2px rgba(227,45,45,.2); }
+
+  .modal-bg {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 200;
+    align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%; max-width: 420px;
+    overflow: hidden;
+  }
+  .modal-header { background: var(--red); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h2 { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+  .modal-num { background: #fff; color: var(--red); font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; padding: 4px 14px; border-radius: 6px; }
+  .modal-body { padding: 20px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 14px; font-family: 'Source Sans 3', sans-serif;
+    outline: none; transition: border-color .15s; color: var(--text);
+  }
+  .field input:focus { border-color: var(--red); }
+  .modal-cause { background: #f5f5f3; border-left: 3px solid var(--blue); padding: 10px 14px; font-size: 12px; color: #555; line-height: 1.5; margin-bottom: 16px; }
+  .btn-confirm {
+    width: 100%; background: var(--red); color: #fff; border: none;
+    border-radius: 8px; padding: 12px; font-family: 'Oswald', sans-serif;
+    font-size: 16px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: background .15s;
+  }
+  .btn-confirm:hover { background: var(--red-dark); }
+  .btn-confirm:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-cancel { width: 100%; background: transparent; border: none; padding: 10px; font-size: 13px; color: var(--muted); cursor: pointer; margin-top: 6px; }
+  .btn-cancel:hover { color: var(--text); }
+  .err-msg { font-size: 13px; color: var(--red); margin-bottom: 10px; display: none; }
+
+  .success-modal { text-align: center; padding: 28px 20px; }
+  .check-circle { width: 64px; height: 64px; border-radius: 50%; background: #1a9e4a; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .check-circle svg { width: 32px; height: 32px; stroke: #fff; stroke-width: 2.5; fill: none; }
+  .success-modal h2 { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .success-modal p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .btn-close-success { margin-top: 20px; background: var(--dark); color: #fff; border: none; border-radius: 8px; padding: 10px 28px; font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 1px; cursor: pointer; }
+
+  footer { text-align: center; padding: 20px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 32px; background: #fff; }
+
+  @media (max-width: 500px) {
+    .grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 5px; }
+    .num-btn { font-size: 12px; }
+    .hero h1 { font-size: 22px; }
+    .hero-meta { gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo"><span class="r">U</span>PA<span class="b">!</span></div>
+    <div class="logo-sub">Ponete de Pie</div>
+  </div>
+  <div class="header-prize">
+    <div class="prize-label">Premio</div>
+    <div class="prize-val">Smart TV 43"</div>
+  </div>
+</header>
+
+<div class="hero">
+  <h1>Rifa Solidaria</h1>
+  <p>Con tu participación colaborás con un curso de habilidades sociales y relaciones sanas para madres con niños.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <div class="hm-label">Sorteo</div>
+      <div class="hm-val">14 / 07 / 2026</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hm-label">Modalidad</div>
+      <div class="hm-val">Lotería Nacional Nocturna</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hm-label">Valor</div>
+      <div class="hm-val">$5.000</div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat">
+    <div class="s-val" id="countTaken">0</div>
+    <div class="s-label">Vendidos</div>
+  </div>
+  <div class="prog-wrap">
+    <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="prog-label" id="progLabel">0 de 500 números vendidos</div>
+  </div>
+  <div class="stat">
+    <div class="s-val" id="countFree">500</div>
+    <div class="s-label">Disponibles</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot free"></div> Disponible</div>
+    <div class="legend-item"><div class="legend-dot taken"></div> Vendido</div>
+    <div class="legend-item"><div class="legend-dot mine"></div> Recién comprado</div>
+  </div>
+  <div class="grid" id="numGrid"></div>
+</div>
+
+<footer>
+  <strong>UPA Ponete de Pie</strong> · www.upaponetedepie.org · upaponetedepie@gmail.com
+</footer>
+
+<!-- Modal compra -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalBox">
+    <div class="modal-header">
+      <h2>Reservar número</h2>
+      <div class="modal-num" id="modalNum">--</div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-cause">Tu participación financia un <strong>curso de habilidades sociales</strong> para madres con niños. ¡Gracias por acompañar a UPA!</div>
+      <div class="err-msg" id="errMsg"></div>
+      <div class="field"><label>Nombre y apellido</label><input type="text" id="inNombre" placeholder="Tu nombre completo"></div>
+      <div class="field"><label>Teléfono / WhatsApp</label><input type="tel" id="inTel" placeholder="11 1234-5678"></div>
+      <button class="btn-confirm" id="btnConfirm" onclick="confirmar()">Confirmar — $5.000</button>
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal éxito -->
+<div class="modal-bg" id="successBg">
+  <div class="modal">
+    <div class="success-modal">
+      <div class="check-circle">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h2>¡Número reservado!</h2>
+      <p id="successText">Tu número fue registrado con éxito.<br>El sorteo es el <strong>14 de julio de 2026</strong> por Lotería Nacional Nocturna.<br><br>Te deseamos mucha suerte.</p>
+      <button class="btn-close-success" onclick="cerrarSuccess()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'TU_SUPABASE_URL';
+  const SUPABASE_KEY = 'TU_SUPABASE_ANON_KEY';
+  const TOTAL = 500;
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let takenNums = new Set();
+  let selectedNum = null;
+  let myNums = new Set();
+
+  async function init() {
+    const { data } = await db.from('numeros').select('numero');
+    if (data) data.forEach(r => takenNums.add(r.numero));
+    buildGrid();
+    updateStats();
+    subscribeRealtime();
+  }
+
+  function buildGrid() {
+    const grid = document.getElementById('numGrid');
+    grid.innerHTML = '';
+    for (let i = 1; i <= TOTAL; i++) {
+      const btn = document.createElement('button');
+      btn.id = 'n' + i;
+      btn.textContent = String(i).padStart(3, '0');
+      btn.className = 'num-btn' + (takenNums.has(i) ? ' taken' : myNums.has(i) ? ' mine' : '');
+      if (!takenNums.has(i) && !myNums.has(i)) btn.onclick = () => abrirModal(i);
+      grid.appendChild(btn);
+    }
+  }
+
+  function updateStats() {
+    const taken = takenNums.size;
+    const pct = Math.round(taken / TOTAL * 100);
+    document.getElementById('countTaken').textContent = taken;
+    document.getElementById('countFree').textContent = TOTAL - taken;
+    document.getElementById('progFill').style.width = pct + '%';
+    document.getElementById('progLabel').textContent = taken + ' de ' + TOTAL + ' números vendidos';
+  }
+
+  function subscribeRealtime() {
+    db.channel('numeros-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'numeros' }, payload => {
+        const num = payload.new.numero;
+        takenNums.add(num);
+        const btn = document.getElementById('n' + num);
+        if (btn && !myNums.has(num)) {
+          btn.className = 'num-btn taken';
+          btn.onclick = null;
+        }
+        updateStats();
+      })
+      .subscribe();
+  }
+
+  function abrirModal(num) {
+    selectedNum = num;
+    document.getElementById('modalNum').textContent = String(num).padStart(3, '0');
+    document.getElementById('inNombre').value = '';
+    document.getElementById('inTel').value = '';
+    document.getElementById('errMsg').style.display = 'none';
+    document.getElementById('modalBg').classList.add('open');
+  }
+
+  function cerrarModal() {
+    document.getElementById('modalBg').classList.remove('open');
+    selectedNum = null;
+  }
+
+  function cerrarSuccess() {
+    document.getElementById('successBg').classList.remove('open');
+  }
+
+  async function confirmar() {
+    const nombre = document.getElementById('inNombre').value.trim();
+    const tel = document.getElementById('inTel').value.trim();
+    const errEl = document.getElementById('errMsg');
+    errEl.style.display = 'none';
+
+    if (!nombre) { errEl.textContent = 'Por favor ingresá tu nombre.'; errEl.style.display = 'block'; return; }
+    if (!tel) { errEl.textContent = 'Por favor ingresá tu teléfono.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('btnConfirm');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    const { error } = await db.from('numeros').insert({ numero: selectedNum, nombre, telefono: tel });
+
+    if (error) {
+      if (error.code === '23505') {
+        errEl.textContent = 'Ese número ya fue tomado. Elegí otro.';
+      } else {
+        errEl.textContent = 'Hubo un error. Intentá de nuevo.';
+      }
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Confirmar — $5.000';
+      return;
+    }
+
+    takenNums.add(selectedNum);
+    myNums.add(selectedNum);
+    const gridBtn = document.getElementById('n' + selectedNum);
+    if (gridBtn) { gridBtn.className = 'num-btn mine'; gridBtn.onclick = null; }
+    updateStats();
+
+    document.getElementById('successText').innerHTML =
+      'Reservaste el número <strong>' + String(selectedNum).padStart(3,'0') + '</strong>, <strong>' + nombre + '</strong>.<br>' +
+      'El sorteo es el <strong>14 de julio de 2026</strong> por Lotería Nacional Nocturna.<br><br>¡Mucha suerte!';
+
+    cerrarModal();
+    document.getElementById('successBg').classList.add('open');
+
+    btn.disabled = false;
+    btn.textContent = 'Confirmar — $5.000';
+
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numero: selectedNum, nombre, telefono: tel })
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>
